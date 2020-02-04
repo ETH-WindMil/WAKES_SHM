@@ -1,2 +1,2 @@
 # WAKES_SHM
-SHM for WTG with wakes
+SHM for WTGs with wakes
