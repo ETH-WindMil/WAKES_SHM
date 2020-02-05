@@ -14,6 +14,9 @@ SHM for WTGs with wakes
 # METHODS
 XXX
 
+# LINKS TO PAPER
+XXX
+
 # DATA
 Data can be found on Zenodo under the following URL:
 
