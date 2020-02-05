@@ -11,6 +11,9 @@ SHM for WTGs with wakes
 - Two turbines
 - Uncertainties: inflow conditions, aerodynamic propoerties, distance between turbines, material fatigue properties
 
+# METHODS
+XXX
+
 # DATA
 Data can be found on Zenodo under the following URL:
 
