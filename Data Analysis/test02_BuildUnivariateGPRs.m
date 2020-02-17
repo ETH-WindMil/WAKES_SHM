@@ -1,3 +1,8 @@
+%%-----------------------------------------------------------------------%%
+% This script constructs univariate GPRs from the  
+% Created by: David Avendano-Valencia - January 2020
+%%-----------------------------------------------------------------------%%
+
 clear
 close all
 clc

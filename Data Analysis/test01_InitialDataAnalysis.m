@@ -1,3 +1,9 @@
+%%-----------------------------------------------------------------------%%
+% This script provides an initial exploratory analysis on the data obtained
+% from the FAST-DWM simulations.
+% Created by: David Avendano-Valencia - January 2020
+%%-----------------------------------------------------------------------%%
+
 clear
 close all
 clc
