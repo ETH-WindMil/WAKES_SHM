@@ -1,5 +1,10 @@
 %%-----------------------------------------------------------------------%%
-% This script constructs univariate GPRs from the  
+% This script performs the optimization of univariate GPRs from the input
+% parameters (wind speed, turbulence intensity, shear exponent and
+% horizontal flow deviation angle) to the Damage Equivalent Loads
+% calculated on different components of the wind turbine. Different GPRs
+% are calculated on the upwind and wake-affected wind turbines.
+%
 % Created by: David Avendano-Valencia - January 2020
 %%-----------------------------------------------------------------------%%
 
@@ -7,6 +12,7 @@ clear
 close all
 clc
 
+%-- Include GPR functions into matlab's path
 addpath('Core\')
 
 %-- Properties of the DWM-FAST simulation

@@ -1,3 +1,14 @@
+%%-----------------------------------------------------------------------%%
+% This script performs a comparison of the Damage Equivalent Loads obtained
+% on the up-wind and wake-affected wind turbines by means of the response
+% surfaces created by optimized GPRs.
+% Differences are measured in terms of the distance between Gaussian
+% distributions and the Kullback-Leibler divergence calculated between the
+% PDF associated with the optimized GPRs.
+%
+% Created by: David Avendano-Valencia - January 2020
+%%-----------------------------------------------------------------------%%
+
 clear
 close all
 clc
@@ -216,7 +227,7 @@ end
 function [x,y,rangeX] = LoadDWMData(component,ind_w_exp,ind_d)
 
 %-- Defining data folder
-data_folder = 'D:\Databases\SHM\Simulation\Wake Simulations - Imad DWM\WakeSims\DWM_FAST_PostProc\';
+data_folder = 'DWM Datasets\';
 
 %-- Loading wake data
 load([data_folder,'DWMwakeInputData'],'wakeData');

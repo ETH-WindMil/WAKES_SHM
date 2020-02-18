@@ -1,3 +1,11 @@
+%%-----------------------------------------------------------------------%%
+% This script performs a comparison of the performance figures obtained in
+% the Monte-Carlo optimization of the GPR of the DELs in the up-wind and
+% wake-affected wind turbines at different components of the wind turbine.
+%
+% Created by: David Avendano-Valencia - January 2020
+%%-----------------------------------------------------------------------%%
+
 clear
 close all
 clc
