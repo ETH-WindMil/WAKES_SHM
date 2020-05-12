@@ -16,7 +16,8 @@ component = 'blade';                                                        % Se
                                                                             % 'blade' - Blade root bending moment in the flapwise and edgewise directions
                                                                             % 'lss'   - Low speed shaft bending moment in the two directions perpendicular to rotation axis
                                                                             % 'yaw'   - Yaw mechanism bending moment in the fore-aft and lateral directions
-
+                                                                            
+                                                                            
 % Wohler exponents for each wind turbine component type
 switch component
     case 'blade'
@@ -67,7 +68,7 @@ switch component
 end
 
 Nburn = 1e3;
-ind_wexp = 1;
+ind_wexp = 4;
 for ind_d = 1:N_dist
     
     load(['Results\UniGPR_',component,...
@@ -88,5 +89,84 @@ for ind_d = 1:N_dist
     end
 end
 
-figure
-plotmatrix(log10(smpl(Nburn+1:end,:,1)))
+%% Hyperparameter confidence intervals vs. distance between wind turbines
+close all
+clc
+
+Nburn = 1e3;
+ind_wexp = 1;
+
+theta_mn = zeros(N_dist,4,4);
+theta_up = zeros(N_dist,4,4);
+theta_dn = zeros(N_dist,4,4);
+
+for ind_d = 1:N_dist
+    
+    load(['Results\UniGPR_',component,...
+        '_WExp_',num2str(w_exp(ind_wexp)),...
+        '_Dist_',num2str(distances(ind_d))],'theta','smpl')
+    
+    for i=1:4
+        
+        theta_mn(ind_d,:,i) = median( log10(smpl(Nburn+1:end,3:end,i)) );
+        theta_up(ind_d,:,i) = prctile( log10(smpl(Nburn+1:end,3:end,i)), 97.5 ) - theta_mn(ind_d,:,i);
+        theta_dn(ind_d,:,i) = theta_mn(ind_d,:,i) - prctile( log10(smpl(Nburn+1:end,3:end,i)),  2.5 );
+        
+    end
+end
+
+figure('Position',[100 100 900 600])
+for i=1:4
+    subplot(2,2,i)
+    errorbar(repmat(distances,N_dist,1)',theta_mn(:,:,i),theta_dn(:,:,i),theta_up(:,:,i),...
+        'LineWidth',2)
+    grid on
+    set(gca,'FontSize',11)
+    title(OutputNames{i})
+    ylim([-11 3]), set(gca,'YTick',-9:3:3)
+    ylabel('Log-hyperparameter value')
+    xlabel('Distance between wind turbines')
+    legend(HyperParNames(3:end),'Interpreter','latex','Orientation','horizontal',...
+        'Location','south')
+end
+
+%% Hyperparameter confidence intervals vs. Wohler exponent
+close all
+clc
+
+Nburn = 1e3;
+ind_d = 2;
+
+theta_mn = zeros(N_wexp,4,4);
+theta_up = zeros(N_wexp,4,4);
+theta_dn = zeros(N_wexp,4,4);
+
+for ind_wexp = 1:N_wexp
+    
+    load(['Results\UniGPR_',component,...
+        '_WExp_',num2str(w_exp(ind_wexp)),...
+        '_Dist_',num2str(distances(ind_d))],'theta','smpl')
+    
+    for i=1:4
+        
+        theta_mn(ind_wexp,:,i) = median( log10(smpl(Nburn+1:end,3:end,i)) );
+        theta_up(ind_wexp,:,i) = prctile( log10(smpl(Nburn+1:end,3:end,i)), 97.5 ) - theta_mn(ind_wexp,:,i);
+        theta_dn(ind_wexp,:,i) = theta_mn(ind_wexp,:,i) - prctile( log10(smpl(Nburn+1:end,3:end,i)),  2.5 );
+        
+    end
+end
+
+figure('Position',[100 100 900 600])
+for i=1:4
+    subplot(2,2,i)
+    errorbar(repmat(w_exp,N_dist,1)',theta_mn(:,:,i),theta_dn(:,:,i),theta_up(:,:,i),...
+        'LineWidth',2)
+    grid on
+    set(gca,'FontSize',11)
+    title(OutputNames{i})
+    ylim([-11 3]), set(gca,'YTick',-9:3:3)
+    ylabel('Log-hyperparameter value')
+    xlabel('Distance between wind turbines')
+    legend(HyperParNames(3:end),'Interpreter','latex','Orientation','horizontal',...
+        'Location','south')
+end
