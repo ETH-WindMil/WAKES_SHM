@@ -10,7 +10,7 @@ clc
 addpath('C:\Users\ldav\Documents\GitHub\Nonlinear Regression AVE\Core\')
 
 %-- Properties of the DWM-FAST simulation
-component = 'yaw';                                                        % Select the type of component to build GPR on DELs
+component = 'blade';                                                        % Select the type of component to build GPR on DELs
                                                                             % 'tower' - Tower base bending moment in the fore-aft and lateral directions
                                                                             % 'blade' - Blade root bending moment in the flapwise and edgewise directions
                                                                             % 'lss'   - Low speed shaft bending moment in the two directions perpendicular to rotation axis
@@ -36,69 +36,47 @@ end
 distances = [3 5 8 11];
 N_dist = 4;
 
-%-- Properties of the Metropolis Hastings sampling algorithm for the GPR
-nsamples = 1e4;                                                             % Number of samples of MHS
-
 %% Computation loop
 
-for ind_d = 1:N_dist
-    for ind_wexp = 1:N_wexp
-        disp(['Calculating GPR for ',component,...
-            ' WExp:',num2str(w_exp(ind_wexp)),...
-            ' Dist:',num2str(distances(ind_d))])
-        [theta,smpl] = ObtainGPRforData(component,nsamples,ind_wexp,ind_d);
-        save(['Results Sparse\UniGPR_',component,...
-            '_WExp_',num2str(w_exp(ind_wexp)),...
-            '_Dist_',num2str(distances(ind_d))],'theta','smpl')
-    end
+ind_d = 3;
+ind_wexp = 1;
+
+disp(['Calculating GPR for ',component,...
+    ' WExp:',num2str(w_exp(ind_wexp)),...
+    ' Dist:',num2str(distances(ind_d))])
+
+m = 10*(1:20);
+theta = zeros(6,10,numel(m));
+lnL = zeros(10,numel(m));
+t = zeros(1,numel(m));
+
+
+for n=1:numel(m)
+    tic
+    [theta(:,:,n),lnL(:,n)] = ObtainGPRforData(component,ind_wexp,ind_d,m(n));
+    t(n) = toc;
 end
 
-%% Plotting results
+save(['Results Sparse\NoVarVSPerformance_',component],'theta','lnL','t')
+
+%%
 close all
 clc
 
-component = 'yaw';
-ind_wexp = 2;
-ind_d = 4;
-load(['Results Sparse\UniGPR_',component,...
-            '_WExp_',num2str(w_exp(ind_wexp)),...
-            '_Dist_',num2str(distances(ind_d))],'theta','smpl')
+% load(['Results Sparse\NoVarVSPerformance_',component],'theta','lnL','t')
 
-HyperParNames = {'\sigma_u^2';
-                 '\sigma_f^2';
-                 '\lambda_1';
-                 '\lambda_2';
-                 '\lambda_3';
-                 '\lambda_4';};
+plot(m,mean(lnL))
 
-figure('Position',[100 100 600 900])
-for i=1:6
-    subplot(6,1,i)
-    plot(log10(squeeze(smpl(:,i,:))))
-    grid on
-    xlabel('Samples')
-    ylabel(HyperParNames{i})
-end
 
-figure('Position',[700 100 900 450])
-for i=1:4
-    subplot(2,2,i)
-    boxplot(log10(smpl(:,:,i)))
-end
-
-figure('Position',[700 600 900 450])
+figure
 for i=1:6
     subplot(2,3,i)
-    for j=1:4
-        histogram(log10(squeeze(smpl(:,i,j))))
-        hold on
-    end
-    xlabel(HyperParNames{i})
+    semilogy(m,squeeze(median(theta(i,:,:),2)))
     grid on
 end
 
 %% ------------------------------------------------------------------------
-function [theta,smpl] = ObtainGPRforData(component,nsamples,ind_w_exp,ind_d)
+function [theta,lnL] = ObtainGPRforData(component,ind_w_exp,ind_d,N)
 
 %-- Defining data folder
 data_folder = 'DWM Datasets\';
@@ -165,23 +143,26 @@ for i=1:2
     end
 end
 
+x = x{1};
+y = y{1};
+
 %-- Markov Chain Monte Carlo optimization of the GPR via Metropolis Hastings sampling
-theta0 = [1e-1 1 1e2*ones(1,size(X,2))];                                    % Prior parameters
+theta0 = ones(1,size(X,2)+2);                                               % Prior parameters
 
-smpl = zeros(nsamples,6,4);
-theta = zeros(6,4);
+theta = zeros(6,10);
+lnL = zeros(10,1);
 
-parfor i = 1:4
+
+parfor i=1:10
     
     %-- Obtaining a sample for Subset of Regressors
-    ind = UniformSpaceSampling( x{i}, 50 );
-    indx = false(size(x{i},2),1);
+    ind = UniformSpaceSampling( x, N );
+    indx = false(1,size(x,2));
     indx(ind) = true;
     
     %-- Sampling from the GPR
-    smp = optimize_gpr_bayes( x{i}, y{i}, theta0, nsamples, 'SoR', indx );
-    smpl(:,:,i) = smp;
-    theta(:,i) = median(smp);
+    [theta(:,i),lnL(i)] = optimize_gpr( x, y, theta0, 'SoR', indx );
+    
 end
 
 end

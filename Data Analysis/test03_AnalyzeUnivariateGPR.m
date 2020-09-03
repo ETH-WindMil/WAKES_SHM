@@ -1,20 +1,9 @@
-%%-----------------------------------------------------------------------%%
-% This script performs a comparison of the Damage Equivalent Loads obtained
-% on the up-wind and wake-affected wind turbines by means of the response
-% surfaces created by optimized GPRs.
-% Differences are measured in terms of the distance between Gaussian
-% distributions and the Kullback-Leibler divergence calculated between the
-% PDF associated with the optimized GPRs.
-%
-% Created by: David Avendano-Valencia - January 2020
-%%-----------------------------------------------------------------------%%
-
 clear
 close all
 clc
 
 %-- Add GPR functions to matlab's path
-addpath('Core\')
+addpath('C:\Users\ldav\Documents\GitHub\Nonlinear Regression AVE\Core')
 
 %-- Properties of the DWM-FAST simulation
 component = 'blade';                                                        % Select the type of component to build GPR on DELs
@@ -46,7 +35,7 @@ N_dist = 4;
 %-- Load results
 ind_wexp = 1;                                                               % Wohler exponent index
 ind_d = 2;                                                                  % Distance index
-load(['Results\UniGPR_',component,...
+load(['Results Sparse\UniGPR_',component,...
             '_WExp_',num2str(w_exp(ind_wexp)),...
             '_Dist_',num2str(distances(ind_d))],'theta','smpl')
 nsamples = size(smpl,1);
@@ -64,22 +53,35 @@ switch component
                        'Edgewise bending moment - Downwind';
                        'Flapwise bending moment - Upwind';
                        'Flapwise bending moment - Downwind'};
+                   
+        OutNames = {'Edgewise bending moment';
+                    'Flapwise bending moment'};
     case 'tower'
         OutputNames = {'Side-to-side bending moment - Upwind';
                        'Side-to-side bending moment - Downwind';
                        'Fore-aft bending moment - Upwind';
                        'Fore-aft bending moment - Downwind'};
                    
+        OutNames = {'Side-to-side bending moment';
+                    'Fore-aft bending moment'};
+                   
 	case 'yaw'
         OutputNames = {'Yaw bearing pitch moment - Upwind';
-                       'Yaw bearing yaw moment - Downwind';
-                       'Yaw bearing pitch moment - Upwind';
+                       'Yaw bearing pitch moment - Downwind';
+                       'Yaw bearing yaw moment - Upwind';
                        'Yaw bearing yaw moment - Downwind'};
+                   
+        OutNames = {'Yaw bearing pitch moment';
+                    'Yaw bearing yaw moment'};
     case 'lss'
         OutputNames = {'LSS bending moment Y axis - Upwind';
-                       'LSS bending moment Z axis - Downwind';
-                       'LSS bending moment Y axis - Upwind';
+                       'LSS bending moment Y axis - Downwind';
+                       'LSS bending moment Z axis - Upwind';
                        'LSS bending moment Z axis - Downwind'};
+                   
+        OutNames = {'LSS bending moment Y axis';
+                    'LSS bending moment Z axis'};
+                   
 end
              
 %% Calculating the response surface based on the optimized GPR
@@ -89,9 +91,9 @@ clc
 %-- Loading training dataset
 [x,y,rangeX] = LoadDWMData(component,ind_wexp,ind_d);
 
-n = 100;
-f_hat = zeros(n^2,4);
-sigmaY2 = zeros(n^2,4);
+n = 30;
+f_hat = zeros(n^4,4);
+sigmaY2 = zeros(n^4,4);
 
 for i=1:4
     
@@ -100,13 +102,67 @@ for i=1:4
     N = size(X,2);
     
     %-- Calculating a grid of wind speeds and turbulence intensity values
-    x_grid = [linspace(0,1,n)' linspace(0,1,n)'];
-    [X1_grid,X2_grid] = meshgrid(x_grid(:,1),x_grid(:,2));
-    Xast = [X1_grid(:) X2_grid(:) median(X(:,3))*ones(n^2,1) median(X(:,4))*ones(n^2,1)];
+    x_grid = linspace(0,1,n)';
+    [X1_grid,X2_grid,X3_grid,X4_grid] = ndgrid( x_grid );
+    Xast = [X1_grid(:) X2_grid(:) X3_grid(:) X4_grid(:)];
+    
+    %-- Obtaining a sample for Subset of Data
+    ind = UniformSpaceSampling( x{i}, 180 );
+    indx = false(size(x{i},2),1);
+    indx(ind) = true;
     
     %-- Predicting DELs in the input grid
-    [f_hat(:,i),sigmaY2(:,i)] = gpr_predict(X,Y,Xast',theta(:,1));
+    [f_hat(:,i),sigmaY2(:,i)] = gpr_predict(Xast',X,Y,theta(:,i),'SoD',indx);
         
+end
+
+save(['Results\ResponseSimulation_',component],'f_hat','sigmaY2','x_grid','n','rangeX')
+
+%% Calculating the integrated KL divergence for each input
+close all
+clc
+
+load(['Results\ResponseSimulation_',component],'f_hat','sigmaY2','x_grid','n','rangeX')
+
+%-- Names of the inputs
+InputNames = {'Wind speed [m/s]';
+              'Turbulence intensity [%]';
+              'Shear exponent';
+              'Inflow horizontal skewness (deg)'};
+
+%-- Calculating the KL divergence for the complete simulation
+err = f_hat(:,[2 4]) - f_hat(:,[1 3]);
+err = err.^2./sigmaY2(:,[1 3]);
+dKL = ( ( sigmaY2(:,[2 4]).\sigmaY2(:,[1 3]) ) + err + log( sigmaY2(:,[2 4])./sigmaY2(:,[1 3]) ) - 1 )/2;
+
+DKL{1} = reshape(dKL(:,1),n,n,n,n);                                         % KL divergence on sensor 1
+DKL{2} = reshape(dKL(:,2),n,n,n,n);                                         % KL divergence on sensor 2
+                                                                            % ( Sensor depends on the selected component )
+input_ind = [1 2 3 4];
+
+figure('Position',[100 100 900 600])
+
+for j=1:4
+    
+    Xg = rangeX(2,j)*x_grid+rangeX(1,j);                                    % Input vector
+    indx_selector = true(1,4);                                              % Selector of dimensions to integrate
+    indx_selector(j) = false;
+    
+    subplot(2,2,j)
+    
+    for i=1:2
+        
+        semilogy( Xg, squeeze( mean( DKL{i}, input_ind(indx_selector) ) ) )
+        grid on
+        hold on
+        
+    end
+    
+    ylabel('$D_{KL}( \mathcal{M}_1 || \mathcal{M}_2 )$','Interpreter','latex')
+    xlabel(InputNames{j})
+    ylim([1e-2 1e1])
+    legend(OutNames,'Location','northoutside')
+    
 end
 
 %% Plotting results
@@ -118,6 +174,7 @@ X2g = rangeX(2,2)*x_grid(:,2)+rangeX(1,2);
 
 clr = lines(4);
 
+%-- Plotting the estimated response surfaces
 
 figure('Position',[100 100 900 800])
 for i=1:4
@@ -126,7 +183,7 @@ for i=1:4
     subplot(2,2,i)
     
     mask = ones(size(f_hat(:,i)));
-    mask(log(sigmaY2(:,i))>-10) = NaN;
+    mask(log(sigmaY2(:,i)) > 4+min(log(sigmaY2(:,i)))) = NaN;
     Z = reshape(f_hat(:,i).*mask,n,n);
     cmap = [ones(1,3); parula(256)];
     
@@ -144,19 +201,25 @@ for i=1:4
         
 end
 
+%% Plotting the error surfaces
+close all
+clc
+
 figure('Position',[100 100 900 450])
 figure('Position',[1000 100 900 450])
 figure('Position',[1000 550 900 450])
 for i=1:2
     
-    err = (f_hat(:,2*i)-f_hat(:,2*i-1))./f_hat(:,2*i-1);
     mask = ones(size(f_hat(:,i)));
-    mask( log( sigmaY2(:,2*i) ) > -10 ) = 0;
+    mask( log10( sigmaY2(:,2*i) ) > 2+min(log10( sigmaY2(:,2*i) )) ) = 0;
+    mask( log10( sigmaY2(:,2*i-1) ) > 2+min(log10( sigmaY2(:,2*i-1) )) ) = 0;
+    
+    err = f_hat(:,2*i) - f_hat(:,2*i-1);
     err(~logical(mask)) = max(err);
-    Z = reshape(100*err,n,n);
+    Z = reshape(err,n,n);
     cmap = [parula(256); ones(1,3)];
     
-    figure(2)
+    figure(1)
     subplot(1,2,i)
     imagesc( X1g, X2g, Z )
     colormap(cmap)
@@ -169,17 +232,21 @@ for i=1:2
     xlabel('Wind speed [m/s]')
     ylabel('Turbulence intensity [%]')
     cbar = colorbar('Location','northoutside');
-    cbar.Label.String = 'Relative difference [%]';
+    cbar.Label.String = 'Pointwise difference';
     xlim([0 25])
     ylim([10 50])
     legend([D1,D2],{'Data points upwind';'Data points downwind'},'Location','southeast')
     
-    err = err.^2./(sigmaY2(:,2*i)+sigmaY2(:,2*i-1));
+    
     mask = ones(size(f_hat(:,i)));
-    mask( log( sigmaY2(:,2*i) ) > -10 ) = inf;
+    mask( log10( sigmaY2(:,2*i) ) > 2+min(log10( sigmaY2(:,2*i) )) ) = inf;
+    mask( log10( sigmaY2(:,2*i-1) ) > 2+min(log10( sigmaY2(:,2*i-1) )) ) = inf;
+    
+    err = f_hat(:,2*i)-f_hat(:,2*i-1);
+    err = err.^2./(sigmaY2(:,2*i)+sigmaY2(:,2*i-1));
     Z = reshape(err.*mask,n,n);
     
-    figure(3)
+    figure(2)
     subplot(1,2,i)
     imagesc( X1g, X2g, Z )
     colormap(cmap)
@@ -199,10 +266,10 @@ for i=1:2
     
     err = f_hat(:,2*i)-f_hat(:,2*i-1);
     err = err.^2./sigmaY2(:,2*i-1);
-    dKL = ( sigmaY2(:,2*i).\sigmaY2(:,2*i-1) ) + err + log( sigmaY2(:,2*i)./sigmaY2(:,2*i-1) );
+    dKL = ( ( sigmaY2(:,2*i).\sigmaY2(:,2*i-1) ) + err + log( sigmaY2(:,2*i)./sigmaY2(:,2*i-1) ) - 1 )/2;
     Z = reshape(dKL.*mask,n,n);
     
-    figure(4)
+    figure(3)
     subplot(1,2,i)    
     imagesc( X1g, X2g, Z )
     colormap(cmap)
@@ -220,73 +287,4 @@ for i=1:2
     ylim([10 50])
     legend([D1,D2],{'Data points upwind';'Data points downwind'},'Location','southeast')
     
-end
-
-
-%% ------------------------------------------------------------------------
-function [x,y,rangeX] = LoadDWMData(component,ind_w_exp,ind_d)
-
-%-- Defining data folder
-data_folder = 'DWM Datasets\';
-
-%-- Loading wake data
-load([data_folder,'DWMwakeInputData'],'wakeData');
-
-%-- Loading Damage Equivalent Loads
-switch component
-    case 'blade'
-        load([data_folder,'BladeFatigueDataTable'],'BladeFatigueDataTable');
-        FatigueData = BladeFatigueDataTable;
-        clear BladeFatigueDataTable
-        Y = [FatigueData.RootMxb1 FatigueData.RootMyb1]/1e4;
-        
-    case 'tower'
-        load([data_folder,'TowerFatigueDataTable'],'TowerFatigueDataTable');
-        FatigueData = TowerFatigueDataTable;
-        clear TowerFatigueDataTable
-        Y = [FatigueData.TwrBsMxt FatigueData.TwrBsMyt]/1e4;
-        
-    case 'lss'
-        load([data_folder,'LSSFatigueDataTable'],'LSSFatigueDataTable');
-        FatigueData = LSSFatigueDataTable;
-        clear LSSFatigueDataTable
-        Y = [FatigueData.LSSGagMya FatigueData.LSSGagMza]/1e4;
-        
-    case 'yaw'
-        load([data_folder,'YawFatigueDataTable'],'YawFatigueDataTable');
-        FatigueData = YawFatigueDataTable;
-        clear YawFatigueDataTable
-        Y = [FatigueData.YawBrMyp FatigueData.YawBrMzp]/1e4;
-        
-end
-
-%-- Determining available Wohler exponents for the selected dataset
-w_exp = unique(FatigueData.m);
-
-%-- Indices to select the Wohler exponent
-indices = FatigueData.m == w_exp(ind_w_exp);
-
-%-- Indices of simulations using the same distance between wind turbines
-dist = unique(wakeData.distBetweenWTG);
-ind_dist = wakeData.distBetweenWTG == dist(ind_d);
-
-%-- Input variables
-X = [wakeData.meanU wakeData.Ti wakeData.alpha wakeData.HFlowAng];
-rangeX = [min(X);
-          max(X)-min(X)];
-X = X - repmat(min(X),size(X,1),1);
-X = X ./ repmat(max(X),size(X,1),1);
-
-%-- Slicing data
-x = cell(4,1);
-y = cell(4,1);
-for i=1:2
-    for j=1:2
-        ind_turbine = wakeData.Turbine == i;
-        x{i+2*(j-1)} = X(ind_turbine&ind_dist,:)';
-        y{i+2*(j-1)} = Y(indices,:);
-        y{i+2*(j-1)} = y{i+2*(j-1)}(ind_turbine&ind_dist,j)';
-    end
-end
-
 end

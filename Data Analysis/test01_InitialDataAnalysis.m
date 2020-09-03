@@ -9,7 +9,7 @@ close all
 clc
 
 %-- Defining data folder
-data_folder = 'D:\Databases\SHM\Simulation\Wake Simulations - Imad DWM\WakeSims\DWM_FAST_PostProc\';
+data_folder = 'DWM Datasets\';
 
 %-- Loading wake data
 load([data_folder,'DWMwakeInputData'],'wakeData');
@@ -25,7 +25,7 @@ w_exp = unique(FatigueData.m);
 close all
 clc
 
-ind_w_exp = 5;
+ind_w_exp = 2;
 indices = FatigueData.m == w_exp(ind_w_exp);
 
 EOPnames = wakeData.Properties.VariableNames(4:8);

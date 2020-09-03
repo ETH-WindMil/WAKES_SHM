@@ -62,7 +62,7 @@ Nburn = 1e3;
 ind_wexp = 1;
 for ind_d = 1:N_dist
     
-    load(['Results Sparse\UniGPR_',component,...
+    load(['Results\UniGPR_',component,...
         '_WExp_',num2str(w_exp(ind_wexp)),...
         '_Dist_',num2str(distances(ind_d))],'theta','smpl')
     
@@ -80,9 +80,37 @@ for ind_d = 1:N_dist
     end
 end
 
-%% Sensitivity
+figure
+plotmatrix(log10(smpl(Nburn+1:end,:,1)))
+
+%% Plotting optimization results
 close all
 clc
+
+HyperParNames = {'$\sigma_u^2$';
+                 '$\sigma_f^2$';
+                 '$\lambda_1$';
+                 '$\lambda_2$';
+                 '$\lambda_3$';
+                 '$\lambda_4$';};
+
+switch component
+    case 'blade'
+        OutputNames = {'Edgewise bending moment - Upwind';
+                       'Edgewise bending moment - Downwind';
+                       'Flapwise bending moment - Upwind';
+                       'Flapwise bending moment - Downwind'};
+    case 'tower'
+        OutputNames = {'Side-to-side bending moment - Upwind';
+                       'Side-to-side bending moment - Downwind';
+                       'Fore-aft bending moment - Upwind';
+                       'Fore-aft bending moment - Downwind'};
+    case 'yaw'
+        OutputNames = {'Yaw bearing pitch moment - Upwind';
+                       'Yaw bearing yaw moment - Downwind';
+                       'Yaw bearing pitch moment - Upwind';
+                       'Yaw bearing yaw moment - Downwind'};
+end
 
 Nburn = 1e3;
 ind_wexp = 1;
@@ -90,13 +118,13 @@ for ind_d = 1:N_dist
     
     load(['Results Sparse\UniGPR_',component,...
         '_WExp_',num2str(w_exp(ind_wexp)),...
-        '_Dist_',num2str(distances(ind_d))],'theta','smpl')
+        '_Dist_',num2str(distances(ind_d))],'theta')
     
     
     figure('Position',[700 100 900 520])
     for i=1:4
         subplot(2,2,i)
-        boxplot(log10(smpl(Nburn+1:end,:,i)),'Notch','on')
+        plot(log10(theta(:,i)),'x')
         set(gca,'FontSize',11)
         set(gca,'XTickLabel',HyperParNames,'TickLabelInterpreter','latex')
         grid on

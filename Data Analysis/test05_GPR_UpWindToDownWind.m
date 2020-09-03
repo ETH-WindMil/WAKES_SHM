@@ -7,7 +7,7 @@ clear
 close all
 clc
 
-addpath('C:\Users\ldav\Documents\GitHub\Nonlinear Regression AVE\Core\')
+addpath('Core')
 
 %-- Properties of the DWM-FAST simulation
 component = 'yaw';                                                        % Select the type of component to build GPR on DELs
@@ -47,7 +47,7 @@ for ind_d = 1:N_dist
             ' WExp:',num2str(w_exp(ind_wexp)),...
             ' Dist:',num2str(distances(ind_d))])
         [theta,smpl] = ObtainGPRforData(component,nsamples,ind_wexp,ind_d);
-        save(['Results Sparse\UniGPR_',component,...
+        save(['Results Up2Dn/UniGPR_Up2Dn',component,...
             '_WExp_',num2str(w_exp(ind_wexp)),...
             '_Dist_',num2str(distances(ind_d))],'theta','smpl')
     end
@@ -57,12 +57,12 @@ end
 close all
 clc
 
-component = 'yaw';
+component = 'blade';
 ind_wexp = 2;
-ind_d = 4;
-load(['Results Sparse\UniGPR_',component,...
-            '_WExp_',num2str(w_exp(ind_wexp)),...
-            '_Dist_',num2str(distances(ind_d))],'theta','smpl')
+ind_d = 1;
+% load(['Results Sparse/UniGPR_',component,...
+%             '_WExp_',num2str(w_exp(ind_wexp)),...
+%             '_Dist_',num2str(distances(ind_d))],'theta','smpl')
 
 HyperParNames = {'\sigma_u^2';
                  '\sigma_f^2';
@@ -80,16 +80,16 @@ for i=1:6
     ylabel(HyperParNames{i})
 end
 
-figure('Position',[700 100 900 450])
-for i=1:4
-    subplot(2,2,i)
+figure('Position',[700 100 900 250])
+for i=1:2
+    subplot(1,2,i)
     boxplot(log10(smpl(:,:,i)))
 end
 
 figure('Position',[700 600 900 450])
 for i=1:6
     subplot(2,3,i)
-    for j=1:4
+    for j=1:2
         histogram(log10(squeeze(smpl(:,i,j))))
         hold on
     end
@@ -101,7 +101,7 @@ end
 function [theta,smpl] = ObtainGPRforData(component,nsamples,ind_w_exp,ind_d)
 
 %-- Defining data folder
-data_folder = 'DWM Datasets\';
+data_folder = 'DWM Datasets/';
 
 %-- Loading wake data
 load([data_folder,'DWMwakeInputData'],'wakeData');
@@ -154,32 +154,34 @@ X = X - repmat(min(X),size(X,1),1);
 X = X ./ repmat(max(X),size(X,1),1);
 
 %-- Slicing data
-x = cell(4,1);
-y = cell(4,1);
-for i=1:2
-    for j=1:2
-        ind_turbine = wakeData.Turbine == i;
-        x{i+2*(j-1)} = X(ind_turbine&ind_dist,:)';
-        y{i+2*(j-1)} = Y(indices,:);
-        y{i+2*(j-1)} = y{i+2*(j-1)}(ind_turbine&ind_dist,j)';
-    end
+x = cell(2,1);
+y = cell(2,1);
+for j=1:2
+    %-- Inputs from upwind turbine
+    ind_turbine = wakeData.Turbine == 1;
+    x{j} = X(ind_turbine&ind_dist,:)';
+    
+    %-- DELs from downwind turbine
+    ind_turbine = wakeData.Turbine == 2;
+    y{j} = Y(indices,:);
+    y{j} = y{j}(ind_turbine&ind_dist,j)';
 end
 
 %-- Markov Chain Monte Carlo optimization of the GPR via Metropolis Hastings sampling
-theta0 = [1e-1 1 1e2*ones(1,size(X,2))];                                    % Prior parameters
+theta0 = ones(1,size(X,2)+2);                                               % Prior parameters
 
-smpl = zeros(nsamples,6,4);
-theta = zeros(6,4);
+smpl = zeros(nsamples,6,2);
+theta = zeros(6,2);
 
-parfor i = 1:4
+parfor i = 1:2
     
     %-- Obtaining a sample for Subset of Regressors
-    ind = UniformSpaceSampling( x{i}, 50 );
+    ind = UniformSpaceSampling( x{i}, 180 );
     indx = false(size(x{i},2),1);
     indx(ind) = true;
     
     %-- Sampling from the GPR
-    smp = optimize_gpr_bayes( x{i}, y{i}, theta0, nsamples, 'SoR', indx );
+    smp = optimize_gpr_bayes( x{i}, y{i}, theta0, nsamples, 'SoD', indx );
     smpl(:,:,i) = smp;
     theta(:,i) = median(smp);
 end
